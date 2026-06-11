@@ -1,5 +1,8 @@
 // LEXIS VISA PLATFORM - app.js
-// Admin + 7-step student immigration wizard with AI
+// Admin dashboard + 7-step student immigration wizard
+// Features: localStorage persistence, mobile AI panel toggle
+
+var STORAGE_KEY = 'lexis_wizard_v1';
 
 // ---- ADMIN NAV ----
 var currentPage = 'dashboard';
@@ -57,6 +60,15 @@ function hideStudentView() {
   navigate('dashboard');
 }
 
+// ---- MOBILE AI PANEL TOGGLE ----
+function toggleAIPanel() {
+  var panel = document.getElementById('ai-panel');
+  if (!panel) return;
+  panel.classList.toggle('collapsed');
+  var btn = document.getElementById('ai-toggle-btn');
+  if (btn) btn.textContent = panel.classList.contains('collapsed') ? '+' : '-';
+}
+
 // ---- WIZARD STATE ----
 var wizardStep = 1;
 var TOTAL_STEPS = 7;
@@ -89,7 +101,7 @@ var steps = [
       { id: 'proposedInstitution', label: 'Proposed Institution', type: 'text', ph: 'e.g. University of Melbourne', req: true },
       { id: 'courseStartDate', label: 'Proposed Course Start Date', type: 'date', req: true },
       { id: 'coeNumber', label: 'COE / Offer Letter Number', type: 'text', ph: 'e.g. COE-2026-1234567', tip: 'If you have your Confirmation of Enrolment, enter it here.' },
-      { id: 'studyMotivation', label: 'Why did you choose this course and institution?', type: 'textarea', ph: 'Describe how this course relates to your qualifications and career goals...', req: true, tip: 'Be specific about how this course connects to your career goals. This is critical for Genuine Student assessment.' }
+      { id: 'studyMotivation', label: 'Why did you choose this course and institution?', type: 'textarea', ph: 'Describe how this course relates to your qualifications and career goals...', req: true, tip: 'Be specific about how this course connects to your career goals. Critical for Genuine Student assessment.' }
     ]
   },
   { id: 3, title: 'Financial Capacity', subtitle: 'Proof of funds for your studies',
@@ -123,7 +135,7 @@ var steps = [
     aiIntro: 'Character requirements are strict but most applicants pass easily. I will guide you through the declarations accurately.',
     aiTips: ['Always declare previous visa refusals, even if minor. Non-disclosure is more damaging than the refusal itself.', 'A good travel history to developed countries can strengthen your case.'],
     fields: [
-      { id: 'criminalRecord', label: 'Have you ever been convicted of a criminal offence?', type: 'select', opts: ['No','Yes - minor offence (e.g. traffic)','Yes - serious offence'], req: true, tip: 'Failure to disclose a criminal record is grounds for automatic visa cancellation, even if the offence would not have prevented the visa.' },
+      { id: 'criminalRecord', label: 'Have you ever been convicted of a criminal offence?', type: 'select', opts: ['No','Yes - minor offence (e.g. traffic)','Yes - serious offence'], req: true, tip: 'Failure to disclose a criminal record is grounds for automatic visa cancellation.' },
       { id: 'criminalDetails', label: 'If yes, describe the offence and outcome', type: 'textarea', ph: 'Include the nature of the offence, year, jurisdiction, and sentence/outcome...' },
       { id: 'policeClearance', label: 'Police Clearance Certificate', type: 'select', opts: ['Not yet obtained','Application submitted','Obtained - within last 12 months','Obtained - older than 12 months'], tip: 'Most countries require police clearance from every country you have lived in for more than 12 months in the last 10 years.' },
       { id: 'previousVisaRefusal', label: 'Have you ever had a visa refused or cancelled?', type: 'select', opts: ['No','Yes - student visa','Yes - other visa type','Yes - multiple refusals'], req: true, tip: 'Previous refusals do not automatically prevent a new application, but must be declared.' },
@@ -148,12 +160,43 @@ var steps = [
     ]
   },
   { id: 7, title: 'Review & Submit', subtitle: 'Review your application before submitting', isReview: true,
-    aiIntro: 'Almost there! Review everything carefully before submitting. Click any section to go back and edit.',
-    aiTips: ['Once submitted, your Lexis advisor will review within 24 hours.', 'Check that all required fields are completed and answers are detailed.']
+    aiIntro: 'Almost there! Review everything carefully before submitting. Click any section header to edit.',
+    aiTips: ['Once submitted, your Lexis advisor will review within 24 hours.', 'Check that all required fields are completed and your answers are detailed.']
   }
 ];
 
-// AI chat responses
+// ---- LOCAL STORAGE HELPERS ----
+function saveToStorage() {
+  try {
+    var state = { wizardStep: wizardStep, wizardData: wizardData, ts: Date.now() };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch(e) {}
+}
+function loadFromStorage() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    var state = JSON.parse(raw);
+    if (state && state.wizardData) {
+      wizardData = state.wizardData;
+      wizardStep = state.wizardStep || 1;
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+function clearStorage() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+}
+function showSaveBanner() {
+  var banner = document.getElementById('save-banner');
+  if (!banner) return;
+  banner.classList.remove('hidden');
+  clearTimeout(window._saveBannerTimer);
+  window._saveBannerTimer = setTimeout(function() { banner.classList.add('hidden'); }, 2500);
+}
+
+// ---- AI CHAT ----
 var aiChatKnowledge = {
   'oshc': 'OSHC (Overseas Student Health Cover) is mandatory for Australian student visas. It must be purchased before your visa is granted and cover your full stay. Major providers: Bupa, Medibank, NIB, Allianz Care.',
   'health': 'Health exams must be done at an approved panel physician. Results are sent directly to immigration. You do not need to submit them separately.',
@@ -161,24 +204,22 @@ var aiChatKnowledge = {
   'ielts': 'Most Australian universities require IELTS 6.0-7.0 overall. Ensure no individual band falls below 5.5-6.0.',
   'funds': 'For an Australian student visa show: tuition fees + approx. AUD 21,041/year for living + travel costs. Funds should ideally be held for 3-6 months.',
   'genuine': 'The Genuine Student test evaluates: your study motivation, ties to home country, immigration history, and whether the course aligns with your career goals.',
-  'refusal': 'A previous refusal does not automatically prevent a new application. You must declare it and explain what has changed in your circumstances.',
+  'refusal': 'A previous refusal does not automatically prevent a new application. You must declare it and explain what has changed.',
   'timeline': 'Australian student visa processing typically takes 4-6 weeks. Apply well in advance of your course start date.',
-  'documents': 'Key documents: passport, COE, OSHC, financial evidence, English test results, academic transcripts, police clearance, health exam results.'
+  'documents': 'Key documents: passport, COE, OSHC, financial evidence, English test results, academic transcripts, police clearance, health exam results.',
+  'save': 'Your answers are automatically saved to your device after every step. You can close the browser and return anytime - your progress will be waiting.',
+  'progress': 'Your progress is saved automatically at each step using your browser storage. It will be here when you come back.'
 };
 function getAIChatResponse(msg) {
   var m = msg.toLowerCase();
   var keys = Object.keys(aiChatKnowledge);
-  for (var i = 0; i < keys.length; i++) {
-    if (m.indexOf(keys[i]) >= 0) return aiChatKnowledge[keys[i]];
-  }
+  for (var i = 0; i < keys.length; i++) { if (m.indexOf(keys[i]) >= 0) return aiChatKnowledge[keys[i]]; }
   if (m.indexOf('help') >= 0 || m.indexOf('what') >= 0) return 'I can help with: OSHC, health exams, COE, IELTS, financial requirements, genuine student test, previous refusals, visa timelines, and required documents.';
   if (m.indexOf('thank') >= 0) return 'You are welcome! Feel free to ask anything else.';
   return 'Great question! Your Lexis advisor will provide personalised advice. I can help with OSHC, financial requirements, health exams, and the genuine student test.';
 }
 
-// ---- WIZARD INIT ----
-function initWizard() { wizardStep = 1; renderStep(1); updateProgress(); }
-
+// ---- RENDER FIELD ----
 function renderField(f) {
   var val = wizardData[f.id] || '';
   var req = f.req ? '<span class="req-star">*</span>' : '';
@@ -193,6 +234,7 @@ function renderField(f) {
   return '<div class="form-group">' + tip + '<label>' + f.label + ' ' + req + '</label><input type="' + f.type + '" id="f_' + f.id + '" placeholder="' + (f.ph||'') + '" value="' + val + '"></div>';
 }
 
+// ---- RENDER STEP ----
 function renderStep(stepNum) {
   var step = steps[stepNum - 1];
   var area = document.getElementById('wizard-form-area');
@@ -203,21 +245,25 @@ function renderStep(stepNum) {
     area.innerHTML = '<div class="step-content"><h2 class="step-title">' + step.title + '</h2><p class="step-subtitle">' + step.subtitle + '</p><div class="step-fields">' + fieldsHTML + '</div></div>';
     step.fields.forEach(function(f) {
       var el = document.getElementById('f_' + f.id);
-      if (el && wizardData[f.id] !== undefined) el.value = wizardData[f.id];
       if (el) {
-        el.addEventListener('input', function() { wizardData[f.id] = el.value; if (f.tip) showFieldTip(f); autoSave(); });
+        el.addEventListener('input', function() { wizardData[f.id] = el.value; if (f.tip) showFieldTip(f); });
         el.addEventListener('change', function() { wizardData[f.id] = el.value; if (f.tip) showFieldTip(f); });
       }
     });
   }
+  // Update AI panel
   var msgs = document.getElementById('ai-messages');
   msgs.innerHTML = '<div class="ai-message ai-welcome"><strong>Step ' + stepNum + ':</strong> ' + step.aiIntro + '</div>';
   if (step.aiTips) step.aiTips.forEach(function(t) { msgs.innerHTML += '<div class="ai-message ai-tip">&#128161; ' + t + '</div>'; });
+  // Nav buttons
   document.getElementById('btn-back').style.display = stepNum > 1 ? '' : 'none';
-  document.getElementById('btn-next').textContent = stepNum === TOTAL_STEPS ? 'Submit Application' : 'Next';
+  document.getElementById('btn-next').textContent = stepNum === TOTAL_STEPS ? 'Submit' : 'Next';
   updateStepCircles(stepNum);
+  // Scroll form to top
+  var formArea = document.getElementById('wizard-form-area');
+  if (formArea) formArea.scrollTop = 0;
+  window.scrollTo(0, 0);
 }
-
 function showFieldTip(f) {
   var msgs = document.getElementById('ai-messages');
   var ex = msgs.querySelector('.ai-field-tip');
@@ -228,15 +274,13 @@ function showFieldTip(f) {
   msgs.appendChild(tip);
   msgs.scrollTop = msgs.scrollHeight;
 }
-
 function getAnswerStrength(f, val) {
   if (!val || (f.type === 'textarea' && val.length < 20)) return { cls: 'strength-weak', badge: '<span class="strength-badge weak">Strengthen</span>' };
   if (f.type === 'textarea' && val.length > 150) return { cls: 'strength-strong', badge: '<span class="strength-badge strong">Strong</span>' };
   return { cls: 'strength-ok', badge: '<span class="strength-badge ok">OK</span>' };
 }
-
 function renderReview() {
-  var html = '<div class="step-content"><h2 class="step-title">Review Your Application</h2><p class="step-subtitle">Check all details before submitting. Click any section header to edit.</p>';
+  var html = '<div class="step-content"><h2 class="step-title">Review Your Application</h2><p class="step-subtitle">Check all details before submitting. Tap any section header to edit.</p>';
   steps.slice(0, 6).forEach(function(s) {
     html += '<div class="review-section"><div class="review-section-header" onclick="goToStep(' + s.id + ')">' + s.title + ' <span class="edit-link">Edit &#9999;</span></div>';
     s.fields.forEach(function(f) {
@@ -251,47 +295,69 @@ function renderReview() {
   html += '<div class="submit-declaration"><h3>Declaration</h3><p>I declare that the information provided is true, correct and complete. I understand that providing false or misleading information may result in visa refusal.</p><label class="checkbox-label"><input type="checkbox" id="declarationCheck"> I confirm all information is true and accurate to the best of my knowledge.</label></div></div>';
   return html;
 }
+function goToStep(n) { saveCurrentStep(); wizardStep = n; renderStep(n); updateProgress(); }
 
-function goToStep(n) { wizardStep = n; renderStep(n); updateProgress(); }
-
+// ---- WIZARD NAVIGATION ----
+function initWizard() {
+  // Try to restore from localStorage
+  var restored = loadFromStorage();
+  if (!restored) { wizardStep = 1; wizardData = {}; }
+  renderStep(wizardStep);
+  updateProgress();
+  // Show restored banner if applicable
+  if (restored && wizardStep > 1) {
+    var msgs = document.getElementById('ai-messages');
+    var note = document.createElement('div');
+    note.className = 'ai-message ai-field-tip';
+    note.innerHTML = '&#128190; <strong>Progress restored!</strong> You were on Step ' + wizardStep + '. Your previous answers have been loaded.';
+    msgs.appendChild(note);
+  }
+}
 function wizardNext() {
   if (wizardStep === TOTAL_STEPS) {
     var check = document.getElementById('declarationCheck');
     if (!check || !check.checked) { alert('Please check the declaration box before submitting.'); return; }
     submitApplication(); return;
   }
-  saveCurrentStep(); wizardStep++; renderStep(wizardStep); updateProgress();
-  var body = document.querySelector('.wizard-body'); if (body) body.scrollTop = 0;
+  saveCurrentStep();
+  saveToStorage();
+  showSaveBanner();
+  wizardStep++;
+  renderStep(wizardStep);
+  updateProgress();
 }
 function wizardBack() {
   if (wizardStep <= 1) return;
-  saveCurrentStep(); wizardStep--; renderStep(wizardStep); updateProgress();
+  saveCurrentStep();
+  saveToStorage();
+  wizardStep--;
+  renderStep(wizardStep);
+  updateProgress();
 }
 function saveCurrentStep() {
   var step = steps[wizardStep - 1];
   if (!step.fields) return;
   step.fields.forEach(function(f) { var el = document.getElementById('f_' + f.id); if (el) wizardData[f.id] = el.value; });
 }
-function autoSave() {
-  var s = document.getElementById('save-status');
-  if (s) { s.textContent = 'Saving...'; setTimeout(function() { s.textContent = 'Auto-saved'; }, 800); }
-}
 function updateProgress() {
   var pct = ((wizardStep - 1) / (TOTAL_STEPS - 1)) * 100;
-  document.getElementById('wizard-progress-fill').style.width = pct + '%';
+  var fill = document.getElementById('wizard-progress-fill');
+  if (fill) fill.style.width = pct + '%';
 }
 function updateStepCircles(current) {
   for (var i = 1; i <= TOTAL_STEPS; i++) {
     var circ = document.getElementById('wcirc-' + i);
     var conn = document.getElementById('wconn-' + i);
+    var item = document.getElementById('wstep-' + i);
     if (!circ) continue;
-    if (i < current) { circ.className = 'step-circle completed'; circ.textContent = 'v'; }
-    else if (i === current) { circ.className = 'step-circle active'; circ.textContent = i; }
-    else { circ.className = 'step-circle'; circ.textContent = i; }
+    if (i < current) { circ.className = 'step-circle completed'; circ.textContent = 'v'; if(item){item.className='wizard-step-item is-completed';} }
+    else if (i === current) { circ.className = 'step-circle active'; circ.textContent = i; if(item){item.className='wizard-step-item is-active';} }
+    else { circ.className = 'step-circle'; circ.textContent = i; if(item){item.className='wizard-step-item';} }
     if (conn) conn.classList.toggle('filled', i < current);
   }
 }
 function submitApplication() {
+  clearStorage();
   var area = document.getElementById('wizard-form-area');
   area.innerHTML = '<div class="step-content success-screen"><div class="success-icon">&#10003;</div><h2>Application Submitted!</h2><p>Your application has been submitted to your Lexis advisor. You will receive a confirmation email and your advisor will review within <strong>24 hours</strong>.</p><div class="next-steps"><h3>What happens next?</h3><div class="next-step-item">&#128231; Confirmation email sent to your registered address</div><div class="next-step-item">&#128100; Advisor review within 24 business hours</div><div class="next-step-item">&#128203; Document checklist will be provided</div><div class="next-step-item">&#127963; Application lodged with immigration authority</div></div><button class="btn-primary" onclick="hideStudentView()">Return to Dashboard</button></div>';
   document.getElementById('btn-next').style.display = 'none';
@@ -308,11 +374,23 @@ function sendAIChat() {
   var resp = getAIChatResponse(msg);
   setTimeout(function() { msgs.innerHTML += '<div class="ai-message ai-bot">&#129302; ' + resp + '</div>'; msgs.scrollTop = msgs.scrollHeight; }, 500);
   input.value = ''; msgs.scrollTop = msgs.scrollHeight;
+  // On mobile, expand AI panel if collapsed
+  var panel = document.getElementById('ai-panel');
+  if (panel && panel.classList.contains('collapsed')) toggleAIPanel();
 }
+// Allow Enter key in AI chat
+function aiChatKeydown(e) { if (e.key === 'Enter') sendAIChat(); }
+
+// ---- INIT ----
 document.addEventListener('DOMContentLoaded', function() {
   navigate('dashboard');
   var today = new Date(); var from = new Date(today); from.setDate(from.getDate() - 5);
   var df = document.getElementById('dateFrom'); var dt = document.getElementById('dateTo');
   if (df) df.valueAsDate = from; if (dt) dt.valueAsDate = today;
   initChart();
+  // On mobile, collapse AI panel by default
+  if (window.innerWidth < 900) {
+    var panel = document.getElementById('ai-panel');
+    if (panel) panel.classList.add('collapsed');
+  }
 });
