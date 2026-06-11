@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#6366f1">
   <title>Lexis Visa Platform</title>
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
@@ -67,22 +71,10 @@
           </div>
         </div>
         <div class="metrics-grid">
-          <div class="metric-card active-card">
-            <div class="metric-label">Active Students</div>
-            <div class="metric-value">12</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Conversion Rate</div>
-            <div class="metric-value">34.5%</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Avg. Processing Time</div>
-            <div class="metric-value">2.3 days</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Submitted to IMMI</div>
-            <div class="metric-value">8</div>
-          </div>
+          <div class="metric-card active-card"><div class="metric-label">Active Students</div><div class="metric-value">12</div></div>
+          <div class="metric-card"><div class="metric-label">Conversion Rate</div><div class="metric-value">34.5%</div></div>
+          <div class="metric-card"><div class="metric-label">Avg. Processing Time</div><div class="metric-value">2.3 days</div></div>
+          <div class="metric-card"><div class="metric-label">Submitted to IMMI</div><div class="metric-value">8</div></div>
         </div>
         <div class="chart-card">
           <h3>Active Students Trend</h3>
@@ -128,19 +120,13 @@
           <input type="text" class="search-input" placeholder="Search students..." oninput="filterStudents(this.value)">
           <select class="stage-filter" onchange="filterByStage(this.value)">
             <option value="">All Stages</option>
-            <option>Invited</option>
-            <option>In Progress</option>
-            <option>Under Review</option>
-            <option>Submitted</option>
-            <option>Approved</option>
+            <option>Invited</option><option>In Progress</option><option>Under Review</option><option>Submitted</option><option>Approved</option>
           </select>
         </div>
         <div id="table-view">
           <table class="data-table full-table">
-            <thead>
-              <tr><th>NAME</th><th>EMAIL</th><th>DESTINATION</th><th>STAGE</th><th>PROGRESS</th><th>LAST ACTIVE</th><th>ACTIONS</th></tr>
-            </thead>
-            <tbody id="students-tbody">
+            <thead><tr><th>NAME</th><th>EMAIL</th><th>DESTINATION</th><th>STAGE</th><th>PROGRESS</th><th>LAST ACTIVE</th><th></th></tr></thead>
+            <tbody>
               <tr><td>Sarah Chen</td><td>sarah.chen@example.com</td><td>Australia</td><td><span class="badge badge-blue">In Progress</span></td><td><div class="progress-bar"><div class="progress-fill" style="width:65%"></div></div></td><td>2h ago</td><td><button class="btn-link" onclick="viewStudent('sarah')">View</button></td></tr>
               <tr><td>Marcus Obi</td><td>marcus.obi@example.com</td><td>Canada</td><td><span class="badge badge-yellow">Under Review</span></td><td><div class="progress-bar"><div class="progress-fill" style="width:90%"></div></div></td><td>5h ago</td><td><button class="btn-link" onclick="viewStudent('marcus')">View</button></td></tr>
               <tr><td>Priya Mehta</td><td>priya.mehta@example.com</td><td>UK</td><td><span class="badge badge-green">Submitted</span></td><td><div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div></td><td>1d ago</td><td><button class="btn-link" onclick="viewStudent('priya')">View</button></td></tr>
@@ -162,9 +148,7 @@
 
       <!-- INVITE PAGE -->
       <div id="page-invite" class="page">
-        <div class="page-header">
-          <h1>Invite New Student</h1>
-        </div>
+        <div class="page-header"><h1>Invite New Student</h1></div>
         <div class="form-card">
           <div class="form-row">
             <div class="form-group"><label>First Name</label><input type="text" placeholder="Enter first name"></div>
@@ -190,7 +174,7 @@
         <div class="page-header"><h1>Configuration</h1></div>
         <div class="config-tabs">
           <button class="config-tab active" onclick="switchConfigTab('profile')">User Profile</button>
-          <button class="config-tab" onclick="switchConfigTab('team')">Team & Admins</button>
+          <button class="config-tab" onclick="switchConfigTab('team')">Team &amp; Admins</button>
           <button class="config-tab" onclick="switchConfigTab('billing')">Billing</button>
           <button class="config-tab" onclick="switchConfigTab('ai')">AI Settings</button>
         </div>
@@ -231,25 +215,32 @@
           </div>
         </div>
       </div>
-
     </main>
   </div>
 
   <!-- STUDENT WIZARD APP -->
   <div id="studentApp" style="display:none">
     <div class="wizard-container">
+
+      <!-- Header -->
       <div class="wizard-header">
-        <div class="wizard-logo"><div class="logo-mark">L</div><span class="logo-text">Lexis</span></div>
+        <div class="sidebar-logo">
+          <div class="logo-mark">L</div>
+          <span class="logo-text">Lexis</span>
+        </div>
         <div class="wizard-meta">
           <span id="wizard-student-name">Student Application</span>
-          <button class="btn-link-small" onclick="hideStudentView()">&#8592; Admin View</button>
+          <button class="btn-link-small" onclick="hideStudentView()">&#8592; Admin</button>
         </div>
       </div>
 
-      <!-- Progress Bar -->
+      <!-- Save Banner -->
+      <div class="save-banner hidden" id="save-banner">&#128190; Progress saved automatically</div>
+
+      <!-- Step Progress Bar -->
       <div class="wizard-progress-outer">
         <div class="wizard-steps-bar">
-          <div class="wizard-step-item" id="wstep-1"><div class="step-circle active" id="wcirc-1">1</div><div class="step-label">Personal Info</div></div>
+          <div class="wizard-step-item is-active" id="wstep-1"><div class="step-circle active" id="wcirc-1">1</div><div class="step-label">Personal</div></div>
           <div class="step-connector" id="wconn-1"></div>
           <div class="wizard-step-item" id="wstep-2"><div class="step-circle" id="wcirc-2">2</div><div class="step-label">Education</div></div>
           <div class="step-connector" id="wconn-2"></div>
@@ -259,7 +250,7 @@
           <div class="step-connector" id="wconn-4"></div>
           <div class="wizard-step-item" id="wstep-5"><div class="step-circle" id="wcirc-5">5</div><div class="step-label">Character</div></div>
           <div class="step-connector" id="wconn-5"></div>
-          <div class="wizard-step-item" id="wstep-6"><div class="step-circle" id="wcirc-6">6</div><div class="step-label">Genuine Intent</div></div>
+          <div class="wizard-step-item" id="wstep-6"><div class="step-circle" id="wcirc-6">6</div><div class="step-label">Intent</div></div>
           <div class="step-connector" id="wconn-6"></div>
           <div class="wizard-step-item" id="wstep-7"><div class="step-circle" id="wcirc-7">7</div><div class="step-label">Review</div></div>
         </div>
@@ -275,32 +266,34 @@
         </div>
 
         <!-- AI Panel -->
-        <div class="ai-panel" id="ai-panel">
-          <div class="ai-panel-header">
+        <div class="ai-panel collapsed" id="ai-panel">
+          <div class="ai-panel-header" onclick="toggleAIPanel()">
             <div class="ai-icon">&#129302;</div>
             <div>
               <div class="ai-title">Lexis AI Assistant</div>
               <div class="ai-subtitle">Real-time guidance</div>
             </div>
+            <button class="ai-toggle-btn" id="ai-toggle-btn" aria-label="Toggle AI panel">+</button>
           </div>
           <div class="ai-messages" id="ai-messages">
             <div class="ai-message ai-welcome">
-              <strong>Welcome!</strong> I'll guide you through each question and help you give the strongest possible answers. Look for tips as you fill in the form.
+              <strong>Welcome!</strong> I will guide you through each question and help you give the strongest possible answers.
             </div>
           </div>
           <div class="ai-chat-input">
-            <input type="text" id="ai-chat-input" placeholder="Ask me anything about your application...">
-            <button onclick="sendAIChat()">&#9654;</button>
+            <input type="text" id="ai-chat-input" placeholder="Ask me anything..." onkeydown="aiChatKeydown(event)">
+            <button onclick="sendAIChat()" aria-label="Send">&#9654;</button>
           </div>
         </div>
       </div>
 
+      <!-- Sticky Footer Nav -->
       <div class="wizard-footer">
         <button class="btn-secondary" id="btn-back" onclick="wizardBack()" style="display:none">&#8592; Back</button>
         <div class="wizard-footer-center">
           <span class="wizard-save-status" id="save-status">&#10003; Auto-saved</span>
         </div>
-        <button class="btn-primary" id="btn-next" onclick="wizardNext()">Next &#8594;</button>
+        <button class="btn-primary" id="btn-next" onclick="wizardNext()">Next</button>
       </div>
     </div>
   </div>
@@ -308,4 +301,4 @@
 </div>
 <script src="app.js"></script>
 </body>
-                                                                                                                                                                                                                                       </html>
+        </html>
